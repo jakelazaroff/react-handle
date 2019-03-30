@@ -4,6 +4,7 @@ import React, {
   MouseEvent,
   ReactNode,
   useEffect,
+  useRef,
   useState
 } from "react";
 import { createPortal } from "react-dom";
@@ -44,7 +45,12 @@ export default function Draggable(props: Props) {
 
   const [origin, setOrigin] = useState<Coord | null>(null);
 
+  const frameCallback = useRef(onDrag);
+  const frameScheduled = useRef(false);
+
   useEffect(() => {
+    frameCallback.current = onDrag;
+
     if (!props.portal && process.env.NODE_ENV === "development")
       console.warn("Draggable portal is undefined.");
   });
@@ -70,14 +76,22 @@ export default function Draggable(props: Props) {
       start = origin || { x: 0, y: 0 };
     const current = { x: clientX, y: clientY };
 
-    onDrag(event, {
-      current,
-      origin: start,
-      distance: {
-        x: current.x - start.x,
-        y: current.y - start.y
-      }
-    });
+    if (!frameScheduled.current) {
+      frameScheduled.current = true;
+
+      requestAnimationFrame(() => {
+        frameScheduled.current = false;
+
+        frameCallback.current(event, {
+          current,
+          origin: start,
+          distance: {
+            x: current.x - start.x,
+            y: current.y - start.y
+          }
+        });
+      });
+    }
   };
 
   const stopDrag = (event: MouseEvent<HTMLDivElement>) => {
