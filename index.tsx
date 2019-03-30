@@ -1,5 +1,11 @@
 // libraries
-import React, { Component, CSSProperties, MouseEvent, ReactNode } from "react";
+import React, {
+  CSSProperties,
+  MouseEvent,
+  ReactNode,
+  useEffect,
+  useState
+} from "react";
 import { createPortal } from "react-dom";
 
 export interface Coord {
@@ -26,107 +32,93 @@ export interface Props {
   onDragStop?(event: MouseEvent<HTMLDivElement>, info: DragInfo): void;
 }
 
-interface State {
-  origin?: {
-    x: number;
-    y: number;
-  };
-}
+export default function Draggable(props: Props) {
+  const {
+    children,
+    cursor,
+    portal,
+    onDragStart = () => {},
+    onDrag = () => {},
+    onDragStop = () => {}
+  } = props;
 
-export default class Draggable extends Component<Props, State> {
-  state: State = {};
+  const [origin, setOrigin] = useState<Coord | null>(null);
 
-  componentDidMount() {
-    this.checkPortal();
-  }
-
-  componentDidUpdate() {
-    this.checkPortal();
-  }
-
-  private checkPortal = () => {
-    if (!this.props.portal && process.env.NODE_ENV === "development")
+  useEffect(() => {
+    if (!props.portal && process.env.NODE_ENV === "development")
       console.warn("Draggable portal is undefined.");
-  };
+  });
 
-  private startDrag = (event: MouseEvent<HTMLElement>) => {
+  const startDrag = (event: MouseEvent<HTMLElement>) => {
     const { clientX, clientY } = event,
       origin = {
         x: clientX,
         y: clientY
       };
 
-    if (this.props.onDragStart)
-      this.props.onDragStart(event, {
-        origin,
-        current: origin,
-        distance: { x: 0, y: 0 }
-      });
+    onDragStart(event, {
+      origin,
+      current: origin,
+      distance: { x: 0, y: 0 }
+    });
 
-    this.setState(() => ({ origin }));
+    setOrigin(origin);
   };
 
-  private drag = (event: MouseEvent<HTMLDivElement>) => {
+  const drag = (event: MouseEvent<HTMLDivElement>) => {
     const { clientX, clientY } = event,
-      { origin = { x: 0, y: 0 } } = this.state;
+      start = origin || { x: 0, y: 0 };
     const current = { x: clientX, y: clientY };
 
-    if (this.props.onDrag)
-      this.props.onDrag(event, {
-        origin,
-        current,
-        distance: {
-          x: current.x - origin.x,
-          y: current.y - origin.y
-        }
-      });
+    onDrag(event, {
+      current,
+      origin: start,
+      distance: {
+        x: current.x - start.x,
+        y: current.y - start.y
+      }
+    });
   };
 
-  private stopDrag = (event: MouseEvent<HTMLDivElement>) => {
+  const stopDrag = (event: MouseEvent<HTMLDivElement>) => {
     const { clientX, clientY } = event,
-      { origin = { x: 0, y: 0 } } = this.state;
+      start = origin || { x: 0, y: 0 };
     const current = { x: clientX, y: clientY };
 
-    if (this.props.onDragStop)
-      this.props.onDragStop(event, {
-        origin,
-        current,
-        distance: {
-          x: current.x - origin.x,
-          y: current.y - origin.y
-        }
-      });
+    onDragStop(event, {
+      current,
+      origin: start,
+      distance: {
+        x: current.x - start.x,
+        y: current.y - start.y
+      }
+    });
 
-    this.setState(() => ({ origin: undefined }));
+    setOrigin(null);
   };
 
-  render() {
-    const { children, portal, cursor } = this.props;
-    const { origin } = this.state;
-
-    return (
-      <>
-        {children({ onMouseDown: this.startDrag })}
-        {!!origin &&
-          portal &&
-          createPortal(
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                bottom: 0,
-                right: 0,
-                left: 0,
-                zIndex: 1000000,
-                pointerEvents: "all",
-                cursor
-              }}
-              onMouseMove={this.drag}
-              onMouseUp={this.stopDrag}
-            />,
-            portal
-          )}
-      </>
-    );
-  }
+  return (
+    <>
+      {children({ onMouseDown: startDrag })}
+      {!!origin &&
+        portal &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              bottom: 0,
+              right: 0,
+              left: 0,
+              zIndex: 1000000,
+              pointerEvents: "all",
+              cursor
+            }}
+            onMouseMove={drag}
+            onMouseUp={stopDrag}
+          />,
+          portal
+        )}
+    </>
+  );
 }
